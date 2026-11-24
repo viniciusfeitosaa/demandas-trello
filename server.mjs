@@ -50,13 +50,17 @@ app.get('/api/health', (_req, res) => {
 app.post('/api/demanda', async (req, res) => {
   try {
     const nome = clean(req.body.nome, 120)
-    const contato = clean(req.body.contato, 160)
-    const projeto = clean(req.body.projeto, 80)
+    const email = clean(req.body.email, 160)
+    const telefone = clean(req.body.telefone, 40)
+    const tipo = clean(req.body.tipo, 80)
     const demanda = clean(req.body.demanda, 4000)
-    const secret = clean(req.body.secret, 80)
+    const invite = clean(req.body.invite || req.body.secret, 80)
 
-    if (FORM_SECRET && secret !== FORM_SECRET) {
-      return res.status(403).json({ ok: false, error: 'Codigo de acesso invalido.' })
+    if (FORM_SECRET && invite !== FORM_SECRET) {
+      return res.status(403).json({
+        ok: false,
+        error: 'Link de convite invalido. Peca o link correto a quem te passou o formulario.',
+      })
     }
     if (!nome || !demanda) {
       return res.status(400).json({ ok: false, error: 'Informe seu nome e a demanda.' })
@@ -64,17 +68,21 @@ app.post('/api/demanda', async (req, res) => {
     if (demanda.length < 10) {
       return res.status(400).json({ ok: false, error: 'Descreva a demanda com um pouco mais de detalhe.' })
     }
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ ok: false, error: 'E-mail parece invalido.' })
+    }
 
-    const title = projeto
-      ? `[${projeto}] ${nome}: ${demanda.slice(0, 70)}${demanda.length > 70 ? '…' : ''}`
+    const title = tipo
+      ? `[${tipo}] ${nome}: ${demanda.slice(0, 70)}${demanda.length > 70 ? '…' : ''}`
       : `${nome}: ${demanda.slice(0, 80)}${demanda.length > 80 ? '…' : ''}`
 
     const desc = [
       '**Demanda recebida pelo formulario publico**',
       '',
       `**Quem pediu:** ${nome}`,
-      `**Contato:** ${contato || '(nao informado)'}`,
-      `**Projeto:** ${projeto || '(nao informado)'}`,
+      `**E-mail:** ${email || '(nao informado)'}`,
+      `**WhatsApp / telefone:** ${telefone || '(nao informado)'}`,
+      `**Tipo:** ${tipo || '(nao informado)'}`,
       `**Quando:** ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Fortaleza' })}`,
       '',
       '## Pedido',

@@ -15,7 +15,6 @@
       --card: #fffdf8;
       --line: #d9cfc0;
       --accent: #0f6b5c;
-      --accent-2: #c45c26;
       --ok: #1f7a4c;
       --err: #a33b2d;
     }
@@ -121,25 +120,31 @@
     <p class="lead">Descreva o que precisa. O pedido vai direto para a caixa de demandas pendentes.</p>
 
     <form id="form" novalidate>
+      <label>
+        Seu nome *
+        <input name="nome" required maxlength="120" autocomplete="name" placeholder="Nome e sobrenome" />
+      </label>
+
       <div class="row">
         <label>
-          Seu nome *
-          <input name="nome" required maxlength="120" autocomplete="name" placeholder="Nome e sobrenome" />
+          E-mail
+          <input name="email" type="email" maxlength="160" autocomplete="email" placeholder="seu@email.com" />
         </label>
         <label>
-          Contato
-          <input name="contato" maxlength="160" autocomplete="email" placeholder="E-mail, WhatsApp ou Teams" />
+          WhatsApp / telefone
+          <input name="telefone" type="tel" maxlength="40" autocomplete="tel" placeholder="(85) 99999-0000" />
         </label>
       </div>
 
       <label>
-        Projeto
-        <select name="projeto">
+        Tipo de pedido
+        <span class="hint">Ajuda a priorizar — sem vínculo com projetos internos.</span>
+        <select name="tipo">
           <option value="">Selecione (opcional)</option>
-          <option>AppVS / Viva Saúde</option>
-          <option>COOPVITTA</option>
-          <option>PixFacil</option>
-          <option>DELTA</option>
+          <option>Nova funcionalidade</option>
+          <option>Ajuste / correção</option>
+          <option>Relatório / dados</option>
+          <option>Suporte / acesso</option>
           <option>Outro</option>
         </select>
       </label>
@@ -147,13 +152,10 @@
       <label>
         Demanda *
         <span class="hint">O que precisa, para quando e qualquer detalhe útil.</span>
-        <textarea name="demanda" required maxlength="4000" placeholder="Ex.: Preciso de um relatório de escalas do contrato X referente a novembro…"></textarea>
+        <textarea name="demanda" required maxlength="4000" placeholder="Ex.: Preciso de um relatório de escalas referente a novembro…"></textarea>
       </label>
 
-      <label id="secretWrap" hidden>
-        Código de acesso
-        <input name="secret" maxlength="80" autocomplete="off" />
-      </label>
+      <input type="hidden" name="invite" id="invite" value="" autocomplete="off" />
 
       <button type="submit" id="btn">Enviar demanda</button>
       <div id="msg" class="msg" role="status" aria-live="polite"></div>
@@ -164,11 +166,9 @@
 
   <script>
     const params = new URLSearchParams(location.search)
-    const needsSecret = params.has('code') || params.get('secret') === '1'
-    if (needsSecret) {
-      document.getElementById('secretWrap').hidden = false
-      if (params.get('code')) document.querySelector('[name=secret]').value = params.get('code')
-    }
+    const invite = params.get('invite') || params.get('t') || ''
+    const inviteInput = document.getElementById('invite')
+    if (invite) inviteInput.value = invite
 
     const form = document.getElementById('form')
     const btn = document.getElementById('btn')
@@ -193,9 +193,7 @@
         msg.className = 'msg ok'
         msg.textContent = json.message
         form.reset()
-        if (needsSecret && params.get('code')) {
-          document.querySelector('[name=secret]').value = params.get('code')
-        }
+        if (invite) inviteInput.value = invite
       } catch (err) {
         msg.className = 'msg err'
         msg.textContent = err.message || 'Não foi possível enviar. Tente de novo.'
