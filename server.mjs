@@ -47,6 +47,10 @@ app.get('/api/health', (_req, res) => {
   res.json({ ok: true })
 })
 
+app.get('/api/config', (_req, res) => {
+  res.json({ ok: true, inviteRequired: Boolean(FORM_SECRET) })
+})
+
 app.post('/api/demanda', async (req, res) => {
   try {
     const nome = clean(req.body.nome, 120)
@@ -57,10 +61,10 @@ app.post('/api/demanda', async (req, res) => {
     const invite = clean(req.body.invite || req.body.secret, 80)
 
     if (FORM_SECRET && invite !== FORM_SECRET) {
-      return res.status(403).json({
-        ok: false,
-        error: 'Link de convite invalido. Peca o link correto a quem te passou o formulario.',
-      })
+      const hint = invite
+        ? 'Link de convite invalido. Confira se a URL termina com ?invite=... igual ao FORM_SECRET do Render.'
+        : 'Este formulario exige link de convite. Abra a URL com ?invite=SEU_TOKEN (o mesmo valor de FORM_SECRET no Render).'
+      return res.status(403).json({ ok: false, error: hint })
     }
     if (!nome || !demanda) {
       return res.status(400).json({ ok: false, error: 'Informe seu nome e a demanda.' })
@@ -96,8 +100,17 @@ app.post('/api/demanda', async (req, res) => {
     const trelloRes = await fetch(url, { method: 'POST' })
     const body = await trelloRes.text()
     if (!trelloRes.ok) {
-      console.error('Trello error', trelloRes.status, body)
-      return res.status(502).json({ ok: false, error: 'Nao foi possivel gravar no Trello agora.' })
+      console.error('Trello error', trelloRes.status, body.slice(0, 500))
+      if (trelloRes.status === 401 || trelloRes.status === 403) {
+        return res.status(502).json({
+          ok: false,
+          error: 'Credenciais Trello rejeitadas. No Render, confira TRELLO_KEY e TRELLO_TOKEN.',
+        })
+      }
+      return res.status(502).json({
+        ok: false,
+        error: `Nao foi possivel gravar no Trello agora (HTTP ${trelloRes.status}).`,
+      })
     }
 
     const card = JSON.parse(body)
