@@ -1,0 +1,24 @@
+# Blueprint Render — formulário público → Trello (Demandas pendentes)
+# Docs: https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: demanda-trello
+    runtime: node
+    plan: free
+    region: oregon
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: TRELLO_LIST_ID
+        value: 6b04dde7590b0cb96af2c5b6
+      # Preencha no painel do Render (não versionar secrets)
+      - key: TRELLO_KEY
+        sync: false
+      - key: TRELLO_TOKEN
+        sync: false
+      # Opcional: se definir, o form exige ?code=SEU_CODIGO ou campo secret
+      - key: FORM_SECRET
+        sync: false

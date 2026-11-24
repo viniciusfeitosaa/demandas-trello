@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Enviar demanda</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,560;9..144,700&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --ink: #1a2332;
+      --muted: #5b6b7c;
+      --paper: #f4efe6;
+      --card: #fffdf8;
+      --line: #d9cfc0;
+      --accent: #0f6b5c;
+      --accent-2: #c45c26;
+      --ok: #1f7a4c;
+      --err: #a33b2d;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Source Sans 3", system-ui, sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(900px 420px at 100% -10%, #e7d7c2 0%, transparent 55%),
+        radial-gradient(700px 380px at -10% 100%, #cfe3dc 0%, transparent 50%),
+        var(--paper);
+      padding: 40px 18px 64px;
+    }
+    main {
+      width: min(640px, 100%);
+      margin: 0 auto;
+    }
+    .brand {
+      font-family: Fraunces, Georgia, serif;
+      font-size: clamp(2rem, 5vw, 2.6rem);
+      line-height: 1.1;
+      margin: 0 0 10px;
+      letter-spacing: -0.02em;
+    }
+    .lead {
+      margin: 0 0 28px;
+      color: var(--muted);
+      font-size: 1.05rem;
+      line-height: 1.5;
+    }
+    form {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 28px 24px;
+      box-shadow: 0 18px 40px rgba(26, 35, 50, 0.08);
+      display: grid;
+      gap: 16px;
+    }
+    label {
+      display: grid;
+      gap: 6px;
+      font-weight: 600;
+      font-size: 0.95rem;
+    }
+    input, select, textarea {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 12px 14px;
+      font: inherit;
+      color: var(--ink);
+      background: #fff;
+    }
+    textarea { min-height: 140px; resize: vertical; }
+    input:focus, select:focus, textarea:focus {
+      outline: 2px solid color-mix(in srgb, var(--accent) 45%, white);
+      border-color: var(--accent);
+    }
+    .hint { font-weight: 400; color: var(--muted); font-size: 0.88rem; }
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+    button {
+      appearance: none;
+      border: 0;
+      border-radius: 999px;
+      padding: 14px 20px;
+      font: inherit;
+      font-weight: 600;
+      color: white;
+      background: linear-gradient(135deg, var(--accent), #148f7c);
+      cursor: pointer;
+    }
+    button:disabled { opacity: 0.6; cursor: wait; }
+    .msg {
+      display: none;
+      padding: 12px 14px;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      line-height: 1.4;
+    }
+    .msg.ok { display: block; background: #e7f6ee; color: var(--ok); }
+    .msg.err { display: block; background: #fbeceb; color: var(--err); }
+    footer {
+      margin-top: 18px;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+    @media (max-width: 560px) {
+      .row { grid-template-columns: 1fr; }
+      form { padding: 22px 16px; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1 class="brand">Registrar demanda</h1>
+    <p class="lead">Descreva o que precisa. O pedido vai direto para a caixa de demandas pendentes.</p>
+
+    <form id="form" novalidate>
+      <div class="row">
+        <label>
+          Seu nome *
+          <input name="nome" required maxlength="120" autocomplete="name" placeholder="Nome e sobrenome" />
+        </label>
+        <label>
+          Contato
+          <input name="contato" maxlength="160" autocomplete="email" placeholder="E-mail, WhatsApp ou Teams" />
+        </label>
+      </div>
+
+      <label>
+        Projeto
+        <select name="projeto">
+          <option value="">Selecione (opcional)</option>
+          <option>AppVS / Viva Saúde</option>
+          <option>COOPVITTA</option>
+          <option>PixFacil</option>
+          <option>DELTA</option>
+          <option>Outro</option>
+        </select>
+      </label>
+
+      <label>
+        Demanda *
+        <span class="hint">O que precisa, para quando e qualquer detalhe útil.</span>
+        <textarea name="demanda" required maxlength="4000" placeholder="Ex.: Preciso de um relatório de escalas do contrato X referente a novembro…"></textarea>
+      </label>
+
+      <label id="secretWrap" hidden>
+        Código de acesso
+        <input name="secret" maxlength="80" autocomplete="off" />
+      </label>
+
+      <button type="submit" id="btn">Enviar demanda</button>
+      <div id="msg" class="msg" role="status" aria-live="polite"></div>
+    </form>
+
+    <footer>Os campos com * são obrigatórios.</footer>
+  </main>
+
+  <script>
+    const params = new URLSearchParams(location.search)
+    const needsSecret = params.has('code') || params.get('secret') === '1'
+    if (needsSecret) {
+      document.getElementById('secretWrap').hidden = false
+      if (params.get('code')) document.querySelector('[name=secret]').value = params.get('code')
+    }
+
+    const form = document.getElementById('form')
+    const btn = document.getElementById('btn')
+    const msg = document.getElementById('msg')
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault()
+      msg.className = 'msg'
+      msg.textContent = ''
+      btn.disabled = true
+      btn.textContent = 'Enviando…'
+
+      const data = Object.fromEntries(new FormData(form).entries())
+      try {
+        const res = await fetch('/api/demanda', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+        })
+        const json = await res.json()
+        if (!res.ok || !json.ok) throw new Error(json.error || 'Falha ao enviar')
+        msg.className = 'msg ok'
+        msg.textContent = json.message
+        form.reset()
+        if (needsSecret && params.get('code')) {
+          document.querySelector('[name=secret]').value = params.get('code')
+        }
+      } catch (err) {
+        msg.className = 'msg err'
+        msg.textContent = err.message || 'Não foi possível enviar. Tente de novo.'
+      } finally {
+        btn.disabled = false
+        btn.textContent = 'Enviar demanda'
+      }
+    })
+  </script>
+</body>
+</html>
