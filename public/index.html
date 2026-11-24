@@ -35,18 +35,33 @@
       width: min(640px, 100%);
       margin: 0 auto;
     }
+    .logo-wrap {
+      display: flex;
+      justify-content: center;
+      margin: 0 0 22px;
+    }
+    .logo {
+      display: block;
+      width: min(220px, 58vw);
+      height: auto;
+      border-radius: 12px;
+      background: #fff;
+      box-shadow: 0 10px 28px rgba(26, 35, 50, 0.08);
+    }
     .brand {
       font-family: Fraunces, Georgia, serif;
-      font-size: clamp(2rem, 5vw, 2.6rem);
-      line-height: 1.1;
+      font-size: clamp(1.75rem, 4.5vw, 2.2rem);
+      line-height: 1.15;
       margin: 0 0 10px;
       letter-spacing: -0.02em;
+      text-align: center;
     }
     .lead {
       margin: 0 0 28px;
       color: var(--muted);
       font-size: 1.05rem;
       line-height: 1.5;
+      text-align: center;
     }
     form {
       background: var(--card);
@@ -117,6 +132,9 @@
 </head>
 <body>
   <main>
+    <div class="logo-wrap">
+      <img class="logo" src="/logo.jpeg" width="220" height="220" alt="Vinicius Feitosa — Serviços em TI" />
+    </div>
     <h1 class="brand">Registrar demanda</h1>
     <p class="lead">Descreva o que precisa. O pedido vai direto para a caixa de demandas pendentes.</p>
 
