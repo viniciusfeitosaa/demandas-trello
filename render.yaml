@@ -19,6 +19,6 @@ services:
         sync: false
       - key: TRELLO_TOKEN
         sync: false
-      # Opcional: se definir, o form exige ?code=SEU_CODIGO ou campo secret
+      # Link de convite: https://demanda-trello.onrender.com/?invite=2026
       - key: FORM_SECRET
-        sync: false
+        value: "2026"
