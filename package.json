@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node server.mjs",
     "dev": "wrangler pages dev public --port 8787",
+    "build": "node -e \"console.log('Pages: static public/ + functions/')\"",
     "deploy": "wrangler pages deploy public --project-name=demanda-trello"
   },
   "dependencies": {

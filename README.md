@@ -9,8 +9,9 @@ Form estático + API em **Cloudflare Pages Functions** (sem servidor ligado 24h,
 3. Repo: `viniciusfeitosaa/demandas-trello`
 4. Build settings:
    - Framework preset: **None**
-   - Build command: *(vazio)*
+   - Build command: *(vazio)* ou `npm run build`
    - Build output directory: `public`
+   - **Deploy command: DEIXE VAZIO** — não use `npx wrangler deploy` (isso é de Worker e quebra o Pages)
 5. **Environment variables** (Production):
    - `TRELLO_KEY` = sua key
    - `TRELLO_TOKEN` = seu token
@@ -21,6 +22,15 @@ Form estático + API em **Cloudflare Pages Functions** (sem servidor ligado 24h,
 ### Link para clientes
 
 `https://SEU-PROJETO.pages.dev/?invite=2026`
+
+### Se o build falhar com `Missing entry-point`
+
+Você colocou **Deploy command** = `npx wrangler deploy`. No Pages isso é errado.
+
+1. Projeto → **Settings** → **Builds & deployments**
+2. **Deploy command** → apague (vazio)
+3. **Build output directory** → `public`
+4. **Retry deployment**
 
 ### CLI (alternativa)
 
