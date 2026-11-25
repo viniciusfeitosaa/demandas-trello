@@ -1,0 +1,13 @@
+name = "demanda-trello"
+compatibility_date = "2025-11-01"
+pages_build_output_dir = "public"
+
+# Variáveis públicas / não-secretas (Production)
+[vars]
+FORM_SECRET = "2026"
+TRELLO_LIST_ID = "6b04dde7590b0cb96af2c5b6"
+
+# Defina no painel Cloudflare Pages (Settings → Environment variables) ou via:
+#   npx wrangler pages secret put TRELLO_KEY --project-name=demanda-trello
+#   npx wrangler pages secret put TRELLO_TOKEN --project-name=demanda-trello
+# Secrets necessários: TRELLO_KEY, TRELLO_TOKEN

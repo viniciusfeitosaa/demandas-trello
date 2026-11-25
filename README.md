@@ -1,35 +1,49 @@
 # Formulário de demandas → Trello
 
-App Node (Express) que recebe pedidos e cria cards na lista **Demandas pendentes** do Kanban.
+Form estático + API em **Cloudflare Pages Functions** (sem servidor ligado 24h, sem cold start de free tier).
 
-## Deploy no Render (Blueprint)
+## Deploy (Cloudflare Pages) — recomendado
 
-1. Suba este pasta para um repositório Git (GitHub/GitLab).
-2. No [Render](https://dashboard.render.com) → **New** → **Blueprint**.
-3. Conecte o repositório (ele lê `render.yaml`).
-4. Quando pedir as variáveis, preencha:
-   - `TRELLO_KEY` — key da API Trello
-   - `TRELLO_TOKEN` — token da API
-   - `FORM_SECRET` — deixe vazio **ou** um token secreto (ex.: `xK9m2pQ`) para link de convite
-5. Após o deploy, use a URL do serviço (tipo `https://demanda-trello.onrender.com`).
+1. Conta em [dash.cloudflare.com](https://dash.cloudflare.com)
+2. **Workers & Pages** → **Create** → **Pages** → **Connect to Git**
+3. Repo: `viniciusfeitosaa/demandas-trello`
+4. Build settings:
+   - Framework preset: **None**
+   - Build command: *(vazio)*
+   - Build output directory: `public`
+5. **Environment variables** (Production):
+   - `TRELLO_KEY` = sua key
+   - `TRELLO_TOKEN` = seu token
+   - `TRELLO_LIST_ID` = `6b04dde7590b0cb96af2c5b6` (opcional se já vier do `wrangler.toml`)
+   - `FORM_SECRET` = `2026`
+6. Deploy → URL tipo `https://demanda-trello.pages.dev`
 
-### Link de convite (sem “código” na tela)
+### Link para clientes
 
-Se `FORM_SECRET` estiver definido, compartilhe só:
+`https://SEU-PROJETO.pages.dev/?invite=2026`
 
-`https://SEU-APP.onrender.com/?invite=SEU_TOKEN`
+### CLI (alternativa)
 
-O cliente não vê campo de senha — o token vai na URL. Sem o `?invite=...` certo, o envio é bloqueado.
-
-No plano free o app “dorme” após ~15 min sem uso; o primeiro acesso pode demorar ~30–50s.
+```bash
+npm i
+npx wrangler pages project create demanda-trello
+npx wrangler pages secret put TRELLO_KEY --project-name=demanda-trello
+npx wrangler pages secret put TRELLO_TOKEN --project-name=demanda-trello
+npm run deploy
+```
 
 ## Local
 
 ```bash
 cp .env.example .env
-# edite .env com key/token
+# preencha TRELLO_KEY e TRELLO_TOKEN
 npm install
-npm start
+npm run dev
 ```
 
-Abra `http://127.0.0.1:8787`.
+`npm run dev` sobe Pages local (`wrangler pages dev`).  
+`npm start` ainda sobe o Express antigo (opcional).
+
+## Render (legado)
+
+O `render.yaml` ficou só como histórico. Pode **apagar o serviço no Render** depois que o Pages estiver ok — free lá dorme e atrasa.

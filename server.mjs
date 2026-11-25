@@ -62,8 +62,8 @@ app.post('/api/demanda', async (req, res) => {
 
     if (FORM_SECRET && invite !== FORM_SECRET) {
       const hint = invite
-        ? 'Link de convite invalido. Confira se a URL termina com ?invite=... igual ao FORM_SECRET do Render.'
-        : 'Este formulario exige link de convite. Abra a URL com ?invite=SEU_TOKEN (o mesmo valor de FORM_SECRET no Render).'
+        ? 'Link de convite invalido. Confira se a URL termina com ?invite=... igual ao FORM_SECRET.'
+        : 'Este formulario exige link de convite. Abra a URL com ?invite=SEU_TOKEN (o mesmo valor de FORM_SECRET).'
       return res.status(403).json({ ok: false, error: hint })
     }
     if (!nome || !demanda) {
@@ -104,7 +104,7 @@ app.post('/api/demanda', async (req, res) => {
       if (trelloRes.status === 401 || trelloRes.status === 403) {
         return res.status(502).json({
           ok: false,
-          error: 'Credenciais Trello rejeitadas. No Render, confira TRELLO_KEY e TRELLO_TOKEN.',
+          error: 'Credenciais Trello rejeitadas. Confira TRELLO_KEY e TRELLO_TOKEN.',
         })
       }
       return res.status(502).json({

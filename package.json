@@ -5,11 +5,15 @@
   "type": "module",
   "scripts": {
     "start": "node server.mjs",
-    "dev": "node server.mjs"
+    "dev": "wrangler pages dev public --port 8787",
+    "deploy": "wrangler pages deploy public --project-name=demanda-trello"
   },
   "dependencies": {
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "express-rate-limit": "^7.5.0"
+  },
+  "devDependencies": {
+    "wrangler": "^4.42.0"
   }
 }
