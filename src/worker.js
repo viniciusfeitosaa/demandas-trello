@@ -1,5 +1,30 @@
 import { clean, enc, formSecret, json } from './helpers.js'
 
+const LABELS = {
+  urgente: '6a89dd5616c6e5fdefbf3b55', // P0
+  alta: '6a89dd57a7f0a0b4bc22c92b', // P1
+  normal: '6a89dd57a929a2da9205f5cd', // P2
+}
+
+const PRIORIDADE_LABEL = {
+  urgente: 'Urgente (imediato)',
+  alta: 'Alta',
+  normal: 'Normal',
+  baixa: 'Baixa',
+}
+
+function parsePrazo(prazo, imediato) {
+  if (imediato) {
+    // Due = agora (Fortaleza), sinaliza imediato no Trello
+    return new Date().toISOString()
+  }
+  const raw = clean(prazo, 32)
+  if (!raw) return null
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return 'invalid'
+  // Fim do dia em Fortaleza (UTC-3) ≈ 23:59 local
+  return `${raw}T23:59:00.000-03:00`
+}
+
 async function handleDemanda(request, env) {
   const KEY = env.TRELLO_KEY
   const TOKEN = env.TRELLO_TOKEN
@@ -27,8 +52,10 @@ async function handleDemanda(request, env) {
   const email = clean(body.email, 160)
   const telefone = clean(body.telefone, 40)
   const tipo = clean(body.tipo, 80)
+  const prioridade = clean(body.prioridade, 20).toLowerCase() || 'normal'
   const demanda = clean(body.demanda, 4000)
   const invite = clean(body.invite || body.secret, 80)
+  const imediato = prioridade === 'urgente' || body.prazo_imediato === '1' || body.prazo_imediato === true
 
   if (FORM_SECRET && invite !== FORM_SECRET) {
     const hint = invite
@@ -45,10 +72,25 @@ async function handleDemanda(request, env) {
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return json({ ok: false, error: 'E-mail parece invalido.' }, 400)
   }
+  if (!['urgente', 'alta', 'normal', 'baixa'].includes(prioridade)) {
+    return json({ ok: false, error: 'Prioridade invalida.' }, 400)
+  }
 
-  const title = tipo
-    ? `[${tipo}] ${nome}: ${demanda.slice(0, 70)}${demanda.length > 70 ? '…' : ''}`
-    : `${nome}: ${demanda.slice(0, 80)}${demanda.length > 80 ? '…' : ''}`
+  const due = parsePrazo(body.prazo, imediato)
+  if (due === 'invalid') {
+    return json({ ok: false, error: 'Prazo invalido. Use o seletor de data.' }, 400)
+  }
+
+  const prioTxt = PRIORIDADE_LABEL[prioridade] || prioridade
+  const prefix = imediato ? '[URGENTE]' : tipo ? `[${tipo}]` : prioridade === 'alta' ? '[ALTA]' : ''
+  const titleCore = `${nome}: ${demanda.slice(0, imediato || tipo || prioridade === 'alta' ? 65 : 80)}${demanda.length > 80 ? '…' : ''}`
+  const title = prefix ? `${prefix} ${titleCore}` : titleCore
+
+  const prazoTxt = imediato
+    ? 'IMEDIATO'
+    : due
+      ? new Date(due).toLocaleString('pt-BR', { timeZone: 'America/Fortaleza' })
+      : '(nao informado)'
 
   const desc = [
     '**Demanda recebida pelo formulario publico**',
@@ -57,15 +99,21 @@ async function handleDemanda(request, env) {
     `**E-mail:** ${email || '(nao informado)'}`,
     `**WhatsApp / telefone:** ${telefone || '(nao informado)'}`,
     `**Tipo:** ${tipo || '(nao informado)'}`,
+    `**Prioridade:** ${prioTxt}`,
+    `**Prazo:** ${prazoTxt}`,
     `**Quando:** ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Fortaleza' })}`,
     '',
     '## Pedido',
     demanda,
   ].join('\n')
 
-  const url =
+  let url =
     `https://api.trello.com/1/cards?key=${enc(KEY)}&token=${enc(TOKEN)}` +
     `&idList=${enc(LIST_ID)}&name=${enc(title)}&desc=${enc(desc)}&pos=top`
+
+  if (due) url += `&due=${enc(due)}`
+  const labelId = LABELS[prioridade]
+  if (labelId) url += `&idLabels=${enc(labelId)}`
 
   const trelloRes = await fetch(url, { method: 'POST' })
   const trelloBody = await trelloRes.text()
@@ -86,7 +134,9 @@ async function handleDemanda(request, env) {
   const card = JSON.parse(trelloBody)
   return json({
     ok: true,
-    message: 'Demanda enviada. Ela ja apareceu na caixa Demandas pendentes.',
+    message: imediato
+      ? 'Demanda urgente enviada. Ela ja apareceu no topo da caixa Demandas pendentes.'
+      : 'Demanda enviada. Ela ja apareceu na caixa Demandas pendentes.',
     cardUrl: card.shortUrl || card.url || null,
   })
 }

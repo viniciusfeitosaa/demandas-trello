@@ -157,7 +157,7 @@
 
       <label>
         Tipo de pedido
-        <span class="hint">Ajuda a priorizar — sem vínculo com projetos internos.</span>
+        <span class="hint">Ajuda a classificar — sem vínculo com projetos internos.</span>
         <select name="tipo">
           <option value="">Selecione (opcional)</option>
           <option>Nova funcionalidade</option>
@@ -168,9 +168,28 @@
         </select>
       </label>
 
+      <div class="row">
+        <label>
+          Prioridade *
+          <span class="hint">Urgente = atendimento imediato.</span>
+          <select name="prioridade" id="prioridade" required>
+            <option value="normal" selected>Normal</option>
+            <option value="baixa">Baixa</option>
+            <option value="alta">Alta</option>
+            <option value="urgente">Urgente (imediato)</option>
+          </select>
+        </label>
+        <label id="prazoWrap">
+          Prazo desejado
+          <span class="hint" id="prazoHint">Data em que precisa estar pronto.</span>
+          <input name="prazo" id="prazo" type="date" />
+          <input type="hidden" name="prazo_imediato" id="prazoImediato" value="" />
+        </label>
+      </div>
+
       <label>
         Demanda *
-        <span class="hint">O que precisa, para quando e qualquer detalhe útil.</span>
+        <span class="hint">O que precisa e qualquer detalhe útil.</span>
         <textarea name="demanda" required maxlength="4000" placeholder="Ex.: Preciso de um relatório de escalas referente a novembro…"></textarea>
       </label>
 
@@ -192,6 +211,26 @@
     const form = document.getElementById('form')
     const btn = document.getElementById('btn')
     const msg = document.getElementById('msg')
+    const prioridade = document.getElementById('prioridade')
+    const prazo = document.getElementById('prazo')
+    const prazoHint = document.getElementById('prazoHint')
+    const prazoImediato = document.getElementById('prazoImediato')
+
+    function syncPrazo() {
+      const urgente = prioridade.value === 'urgente'
+      prazoImediato.value = urgente ? '1' : ''
+      if (urgente) {
+        prazo.value = ''
+        prazo.disabled = true
+        prazo.required = false
+        prazoHint.textContent = 'Urgente = imediato. Sem data futura.'
+      } else {
+        prazo.disabled = false
+        prazoHint.textContent = 'Data em que precisa estar pronto (opcional).'
+      }
+    }
+    prioridade.addEventListener('change', syncPrazo)
+    syncPrazo()
 
     fetch('/api/config')
       .then((r) => r.json())
@@ -212,6 +251,7 @@
       btn.textContent = 'Enviando…'
 
       const data = Object.fromEntries(new FormData(form).entries())
+      data.prazo_imediato = prioridade.value === 'urgente' ? '1' : ''
       try {
         const res = await fetch('/api/demanda', {
           method: 'POST',
@@ -224,6 +264,7 @@
         msg.textContent = json.message
         form.reset()
         if (invite) inviteInput.value = invite
+        syncPrazo()
       } catch (err) {
         msg.className = 'msg err'
         msg.textContent = err.message || 'Não foi possível enviar. Tente de novo.'
