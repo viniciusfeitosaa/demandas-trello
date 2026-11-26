@@ -209,9 +209,22 @@ function buildNotifyMail({ nome, email, cardName, cardUrl, mensagem }) {
     .join('\n')
     .trim()
 
-  const mailto =
-    `mailto:${enc(email)}?subject=${enc(assunto)}&body=${enc(corpo)}`
-  return { assunto, corpo, mailto, email }
+  const msgHtml = mensagem
+    ? `<p><strong>Retorno:</strong></p><p>${mensagem.replace(/\n/g, '<br>')}</p>`
+    : ''
+  const html = `
+    <div style="font-family:Georgia,serif;line-height:1.5;color:#1a2332">
+      <p>Ola${nome ? ` ${nome}` : ''},</p>
+      <p>Sua demanda foi <strong>concluida</strong>.</p>
+      <p><strong>Titulo:</strong> ${cardName}</p>
+      ${cardUrl ? `<p><a href="${cardUrl}">Ver referencia</a></p>` : ''}
+      ${msgHtml}
+      <p>Atenciosamente,<br>Vinicius Feitosa — Servicos em TI</p>
+    </div>
+  `.trim()
+
+  const mailto = `mailto:${enc(email)}?subject=${enc(assunto)}&body=${enc(corpo)}`
+  return { assunto, corpo, html, mailto, email }
 }
 
 async function handleNotificar(request, env) {
@@ -260,19 +273,28 @@ async function handleNotificar(request, env) {
           to: [email],
           subject: mail.assunto,
           text: mail.corpo,
+          html: mail.html,
         }),
       })
+      const bodyTxt = await r.text()
       if (r.ok) sent = true
-      else sendError = `Resend HTTP ${r.status}`
+      else {
+        let detail = bodyTxt.slice(0, 300)
+        try {
+          const j = JSON.parse(bodyTxt)
+          detail = j.message || j.error || detail
+        } catch {}
+        sendError = `Resend HTTP ${r.status}: ${detail}`
+      }
     } catch (err) {
       sendError = String(err)
     }
   }
 
-  // Comentario no card (rastreio)
+  const when = new Date().toLocaleString('pt-BR', { timeZone: 'America/Fortaleza' })
   const comment = sent
-    ? `Cliente notificado por e-mail (${email}) em ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Fortaleza' })}.`
-    : `Retorno preparado para ${email} em ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Fortaleza' })}. Envio via cliente de e-mail.`
+    ? `Cliente notificado por e-mail (${email}) via Resend em ${when}.`
+    : `Retorno preparado para ${email} em ${when}.${sendError ? ` Auto-envio falhou: ${sendError}` : ' Abra o mailto.'}`
   await fetch(
     `https://api.trello.com/1/cards/${enc(got.card.id)}/actions/comments?key=${enc(got.KEY)}&token=${enc(got.TOKEN)}&text=${enc(comment)}`,
     { method: 'POST' },
@@ -285,8 +307,10 @@ async function handleNotificar(request, env) {
     mailto: mail.mailto,
     email,
     message: sent
-      ? 'E-mail de conclusao enviado ao cliente.'
-      : 'Pronto. Abra o e-mail no botao abaixo (ou configure RESEND_API_KEY para envio automatico).',
+      ? 'E-mail de conclusao enviado automaticamente ao cliente (Resend).'
+      : sendError
+        ? `Nao enviou automatico (${sendError}). Use o botao do seu e-mail.`
+        : 'Pronto. Abra o e-mail no botao abaixo.',
   })
 }
 
