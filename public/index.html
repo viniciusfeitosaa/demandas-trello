@@ -98,6 +98,18 @@
       grid-template-columns: 1fr 1fr;
       gap: 14px;
     }
+    .check {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      font-weight: 500;
+      line-height: 1.4;
+    }
+    .check input {
+      width: auto;
+      margin-top: 3px;
+      accent-color: var(--accent);
+    }
     button {
       appearance: none;
       border: 0;
@@ -146,14 +158,19 @@
 
       <div class="row">
         <label>
-          E-mail
-          <input name="email" type="email" maxlength="160" autocomplete="email" placeholder="seu@email.com" />
+          E-mail <span id="emailReqMark"></span>
+          <input name="email" id="email" type="email" maxlength="160" autocomplete="email" placeholder="seu@email.com" />
         </label>
         <label>
           WhatsApp / telefone
           <input name="telefone" type="tel" maxlength="40" autocomplete="tel" placeholder="(85) 99999-0000" />
         </label>
       </div>
+
+      <label class="check">
+        <input type="checkbox" name="avisar" id="avisar" value="1" />
+        <span>Quero ser avisado por e-mail quando a demanda for concluída</span>
+      </label>
 
       <label>
         Tipo de pedido
@@ -232,6 +249,17 @@
     prioridade.addEventListener('change', syncPrazo)
     syncPrazo()
 
+    const avisar = document.getElementById('avisar')
+    const emailInput = document.getElementById('email')
+    const emailReqMark = document.getElementById('emailReqMark')
+    function syncAvisar() {
+      const on = avisar.checked
+      emailInput.required = on
+      emailReqMark.textContent = on ? '*' : ''
+    }
+    avisar.addEventListener('change', syncAvisar)
+    syncAvisar()
+
     fetch('/api/config')
       .then((r) => r.json())
       .then((cfg) => {
@@ -252,6 +280,14 @@
 
       const data = Object.fromEntries(new FormData(form).entries())
       data.prazo_imediato = prioridade.value === 'urgente' ? '1' : ''
+      data.avisar = avisar.checked ? '1' : ''
+      if (avisar.checked && !String(data.email || '').trim()) {
+        msg.className = 'msg err'
+        msg.textContent = 'Informe o e-mail para receber o aviso de conclusão.'
+        btn.disabled = false
+        btn.textContent = 'Enviar demanda'
+        return
+      }
       try {
         const res = await fetch('/api/demanda', {
           method: 'POST',

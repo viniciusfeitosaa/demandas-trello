@@ -1,4 +1,12 @@
-import { clean, enc, formSecret, json } from './helpers.js'
+import {
+  cardIdFromInput,
+  clean,
+  enc,
+  formSecret,
+  json,
+  parseCardMeta,
+  requireInvite,
+} from './helpers.js'
 
 const LABELS = {
   urgente: '6a89dd5616c6e5fdefbf3b55', // P0
@@ -14,14 +22,10 @@ const PRIORIDADE_LABEL = {
 }
 
 function parsePrazo(prazo, imediato) {
-  if (imediato) {
-    // Due = agora (Fortaleza), sinaliza imediato no Trello
-    return new Date().toISOString()
-  }
+  if (imediato) return new Date().toISOString()
   const raw = clean(prazo, 32)
   if (!raw) return null
   if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return 'invalid'
-  // Fim do dia em Fortaleza (UTC-3) ≈ 23:59 local
   return `${raw}T23:59:00.000-03:00`
 }
 
@@ -29,14 +33,10 @@ async function handleDemanda(request, env) {
   const KEY = env.TRELLO_KEY
   const TOKEN = env.TRELLO_TOKEN
   const LIST_ID = env.TRELLO_LIST_ID
-  const FORM_SECRET = formSecret(env)
 
   if (!KEY || !TOKEN || !LIST_ID) {
     return json(
-      {
-        ok: false,
-        error: 'Faltam TRELLO_KEY / TRELLO_TOKEN / TRELLO_LIST_ID no Cloudflare.',
-      },
+      { ok: false, error: 'Faltam TRELLO_KEY / TRELLO_TOKEN / TRELLO_LIST_ID no Cloudflare.' },
       500,
     )
   }
@@ -48,26 +48,26 @@ async function handleDemanda(request, env) {
     return json({ ok: false, error: 'JSON invalido.' }, 400)
   }
 
+  const inviteGate = requireInvite(env, body.invite || body.secret)
+  if (inviteGate) return inviteGate
+
   const nome = clean(body.nome, 120)
   const email = clean(body.email, 160)
   const telefone = clean(body.telefone, 40)
   const tipo = clean(body.tipo, 80)
   const prioridade = clean(body.prioridade, 20).toLowerCase() || 'normal'
   const demanda = clean(body.demanda, 4000)
-  const invite = clean(body.invite || body.secret, 80)
+  const avisar = body.avisar === '1' || body.avisar === true
   const imediato = prioridade === 'urgente' || body.prazo_imediato === '1' || body.prazo_imediato === true
 
-  if (FORM_SECRET && invite !== FORM_SECRET) {
-    const hint = invite
-      ? 'Link de convite invalido. Use ?invite= igual ao FORM_SECRET.'
-      : 'Este formulario exige link de convite. Abra com ?invite=SEU_TOKEN.'
-    return json({ ok: false, error: hint }, 403)
-  }
   if (!nome || !demanda) {
     return json({ ok: false, error: 'Informe seu nome e a demanda.' }, 400)
   }
   if (demanda.length < 10) {
     return json({ ok: false, error: 'Descreva a demanda com um pouco mais de detalhe.' }, 400)
+  }
+  if (avisar && !email) {
+    return json({ ok: false, error: 'Informe o e-mail para receber o aviso de conclusao.' }, 400)
   }
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return json({ ok: false, error: 'E-mail parece invalido.' }, 400)
@@ -101,11 +101,17 @@ async function handleDemanda(request, env) {
     `**Tipo:** ${tipo || '(nao informado)'}`,
     `**Prioridade:** ${prioTxt}`,
     `**Prazo:** ${prazoTxt}`,
+    `**Aviso de conclusao:** ${avisar ? 'sim' : 'nao'}`,
     `**Quando:** ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Fortaleza' })}`,
+    '',
+    `NOTIFY: ${avisar ? 'sim' : 'nao'}`,
+    email ? `NOTIFY_EMAIL: ${email}` : '',
     '',
     '## Pedido',
     demanda,
-  ].join('\n')
+  ]
+    .filter(Boolean)
+    .join('\n')
 
   let url =
     `https://api.trello.com/1/cards?key=${enc(KEY)}&token=${enc(TOKEN)}` +
@@ -141,6 +147,149 @@ async function handleDemanda(request, env) {
   })
 }
 
+async function fetchCard(env, cardRef) {
+  const id = cardIdFromInput(cardRef)
+  if (!id) return { error: json({ ok: false, error: 'Informe o link ou ID do card Trello.' }, 400) }
+  const KEY = env.TRELLO_KEY
+  const TOKEN = env.TRELLO_TOKEN
+  if (!KEY || !TOKEN) {
+    return { error: json({ ok: false, error: 'Trello nao configurado no Worker.' }, 500) }
+  }
+  const res = await fetch(
+    `https://api.trello.com/1/cards/${enc(id)}?key=${enc(KEY)}&token=${enc(TOKEN)}&fields=id,name,desc,shortUrl,url,due,idList`,
+  )
+  const text = await res.text()
+  if (!res.ok) {
+    return { error: json({ ok: false, error: 'Card nao encontrado no Trello.' }, 404) }
+  }
+  return { card: JSON.parse(text), KEY, TOKEN }
+}
+
+async function handleCardInfo(request, env) {
+  let body
+  try {
+    body = await request.json()
+  } catch {
+    return json({ ok: false, error: 'JSON invalido.' }, 400)
+  }
+  const gate = requireInvite(env, body.invite)
+  if (gate) return gate
+
+  const got = await fetchCard(env, body.card)
+  if (got.error) return got.error
+
+  const meta = parseCardMeta(got.card.desc)
+  return json({
+    ok: true,
+    card: {
+      id: got.card.id,
+      name: got.card.name,
+      shortUrl: got.card.shortUrl || got.card.url,
+    },
+    ...meta,
+  })
+}
+
+function buildNotifyMail({ nome, email, cardName, cardUrl, mensagem }) {
+  const assunto = `Demanda concluída: ${cardName.slice(0, 80)}`
+  const corpo = [
+    `Ola${nome ? ` ${nome}` : ''},`,
+    '',
+    'Sua demanda foi concluida.',
+    '',
+    `Titulo: ${cardName}`,
+    cardUrl ? `Card: ${cardUrl}` : '',
+    '',
+    mensagem ? `Retorno:\n${mensagem}` : '',
+    '',
+    'Atenciosamente,',
+    'Vinicius Feitosa — Servicos em TI',
+  ]
+    .filter((line, i, arr) => !(line === '' && arr[i - 1] === ''))
+    .join('\n')
+    .trim()
+
+  const mailto =
+    `mailto:${enc(email)}?subject=${enc(assunto)}&body=${enc(corpo)}`
+  return { assunto, corpo, mailto, email }
+}
+
+async function handleNotificar(request, env) {
+  let body
+  try {
+    body = await request.json()
+  } catch {
+    return json({ ok: false, error: 'JSON invalido.' }, 400)
+  }
+  const gate = requireInvite(env, body.invite)
+  if (gate) return gate
+
+  const got = await fetchCard(env, body.card)
+  if (got.error) return got.error
+
+  const meta = parseCardMeta(got.card.desc)
+  const email = clean(body.email || meta.email, 160)
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return json(
+      { ok: false, error: 'Este card nao tem e-mail valido. Informe o e-mail manualmente.' },
+      400,
+    )
+  }
+
+  const mensagem = clean(body.mensagem, 2000)
+  const mail = buildNotifyMail({
+    nome: meta.nome,
+    email,
+    cardName: got.card.name,
+    cardUrl: got.card.shortUrl || got.card.url,
+    mensagem,
+  })
+
+  let sent = false
+  let sendError = null
+  if (env.RESEND_API_KEY && env.NOTIFY_FROM) {
+    try {
+      const r = await fetch('https://api.resend.com/emails', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${env.RESEND_API_KEY}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          from: env.NOTIFY_FROM,
+          to: [email],
+          subject: mail.assunto,
+          text: mail.corpo,
+        }),
+      })
+      if (r.ok) sent = true
+      else sendError = `Resend HTTP ${r.status}`
+    } catch (err) {
+      sendError = String(err)
+    }
+  }
+
+  // Comentario no card (rastreio)
+  const comment = sent
+    ? `Cliente notificado por e-mail (${email}) em ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Fortaleza' })}.`
+    : `Retorno preparado para ${email} em ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Fortaleza' })}. Envio via cliente de e-mail.`
+  await fetch(
+    `https://api.trello.com/1/cards/${enc(got.card.id)}/actions/comments?key=${enc(got.KEY)}&token=${enc(got.TOKEN)}&text=${enc(comment)}`,
+    { method: 'POST' },
+  )
+
+  return json({
+    ok: true,
+    sent,
+    sendError,
+    mailto: mail.mailto,
+    email,
+    message: sent
+      ? 'E-mail de conclusao enviado ao cliente.'
+      : 'Pronto. Abra o e-mail no botao abaixo (ou configure RESEND_API_KEY para envio automatico).',
+  })
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url)
@@ -150,10 +299,20 @@ export default {
         return json({ ok: true })
       }
       if (url.pathname === '/api/config' && request.method === 'GET') {
-        return json({ ok: true, inviteRequired: Boolean(formSecret(env)) })
+        return json({
+          ok: true,
+          inviteRequired: Boolean(formSecret(env)),
+          autoEmail: Boolean(env.RESEND_API_KEY && env.NOTIFY_FROM),
+        })
       }
       if (url.pathname === '/api/demanda' && request.method === 'POST') {
         return await handleDemanda(request, env)
+      }
+      if (url.pathname === '/api/card-info' && request.method === 'POST') {
+        return await handleCardInfo(request, env)
+      }
+      if (url.pathname === '/api/notificar' && request.method === 'POST') {
+        return await handleNotificar(request, env)
       }
       if (url.pathname.startsWith('/api/')) {
         return json({ ok: false, error: 'Rota nao encontrada.' }, 404)

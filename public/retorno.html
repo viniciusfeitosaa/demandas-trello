@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Retorno ao cliente</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,560;9..144,700&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --ink: #1a2332;
+      --muted: #5b6b7c;
+      --paper: #f4efe6;
+      --card: #fffdf8;
+      --line: #d9cfc0;
+      --accent: #0f6b5c;
+      --ok: #1f7a4c;
+      --err: #a33b2d;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Source Sans 3", system-ui, sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(900px 420px at 100% -10%, #e7d7c2 0%, transparent 55%),
+        radial-gradient(700px 380px at -10% 100%, #cfe3dc 0%, transparent 50%),
+        var(--paper);
+      padding: 40px 18px 64px;
+    }
+    main { width: min(640px, 100%); margin: 0 auto; }
+    .brand {
+      font-family: Fraunces, Georgia, serif;
+      font-size: clamp(1.6rem, 4vw, 2rem);
+      margin: 0 0 8px;
+      text-align: center;
+    }
+    .lead { color: var(--muted); text-align: center; margin: 0 0 24px; line-height: 1.45; }
+    form, .panel {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 24px;
+      box-shadow: 0 18px 40px rgba(26, 35, 50, 0.08);
+      display: grid;
+      gap: 14px;
+    }
+    .panel { margin-top: 16px; display: none; }
+    .panel.show { display: grid; }
+    label { display: grid; gap: 6px; font-weight: 600; font-size: 0.95rem; }
+    input, textarea {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 12px 14px;
+      font: inherit;
+      background: #fff;
+    }
+    textarea { min-height: 110px; resize: vertical; }
+    .hint { font-weight: 400; color: var(--muted); font-size: 0.88rem; }
+    .meta { color: var(--muted); font-size: 0.92rem; line-height: 1.45; }
+    .meta strong { color: var(--ink); }
+    .actions { display: flex; flex-wrap: wrap; gap: 10px; }
+    button, .btn {
+      appearance: none;
+      border: 0;
+      border-radius: 999px;
+      padding: 12px 18px;
+      font: inherit;
+      font-weight: 600;
+      color: white;
+      background: linear-gradient(135deg, var(--accent), #148f7c);
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+    }
+    button.secondary { background: #3d4f63; }
+    button:disabled { opacity: 0.6; cursor: wait; }
+    .msg { display: none; padding: 12px 14px; border-radius: 10px; font-size: 0.95rem; }
+    .msg.ok { display: block; background: #e7f6ee; color: var(--ok); }
+    .msg.err { display: block; background: #fbeceb; color: var(--err); }
+    footer { margin-top: 18px; color: var(--muted); font-size: 0.85rem; text-align: center; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1 class="brand">Retorno ao cliente</h1>
+    <p class="lead">Cole o link do card no Trello. Montamos o aviso de conclusão (e-mail).</p>
+
+    <form id="form">
+      <label>
+        Link ou ID do card *
+        <input name="card" id="card" required placeholder="https://trello.com/c/xxxxx ou ID" />
+      </label>
+      <input type="hidden" id="invite" name="invite" value="" />
+      <button type="submit" id="btnLoad">Buscar card</button>
+      <div id="msg" class="msg" role="status"></div>
+    </form>
+
+    <div class="panel" id="panel">
+      <div class="meta" id="meta"></div>
+      <label>
+        E-mail do cliente
+        <input id="email" type="email" />
+      </label>
+      <label>
+        Mensagem de retorno (opcional)
+        <span class="hint">Ex.: “Relatório enviado por e-mail” ou “Acesso liberado”.</span>
+        <textarea id="mensagem" maxlength="2000"></textarea>
+      </label>
+      <div class="actions">
+        <button type="button" id="btnNotify">Preparar / enviar aviso</button>
+        <a class="btn secondary" id="btnMailto" href="#" hidden>Abrir no meu e-mail</a>
+      </div>
+      <div id="msg2" class="msg" role="status"></div>
+    </div>
+
+    <footer>Uso interno. Abra com o mesmo <code>?invite=</code> do formulário.</footer>
+  </main>
+
+  <script>
+    const params = new URLSearchParams(location.search)
+    const invite = params.get('invite') || params.get('t') || ''
+    document.getElementById('invite').value = invite
+
+    const form = document.getElementById('form')
+    const panel = document.getElementById('panel')
+    const meta = document.getElementById('meta')
+    const email = document.getElementById('email')
+    const mensagem = document.getElementById('mensagem')
+    const msg = document.getElementById('msg')
+    const msg2 = document.getElementById('msg2')
+    const btnLoad = document.getElementById('btnLoad')
+    const btnNotify = document.getElementById('btnNotify')
+    const btnMailto = document.getElementById('btnMailto')
+    let currentCard = ''
+
+    if (!invite) {
+      msg.className = 'msg err'
+      msg.textContent = 'Abra /retorno.html?invite=SEU_TOKEN'
+      btnLoad.disabled = true
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault()
+      msg.className = 'msg'
+      msg2.className = 'msg'
+      btnMailto.hidden = true
+      btnLoad.disabled = true
+      try {
+        const res = await fetch('/api/card-info', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ invite, card: document.getElementById('card').value }),
+        })
+        const data = await res.json()
+        if (!res.ok || !data.ok) throw new Error(data.error || 'Falha')
+        currentCard = data.card.shortUrl || data.card.id
+        meta.innerHTML =
+          `<strong>${data.card.name}</strong><br>` +
+          `Quem pediu: ${data.nome || '—'}<br>` +
+          `Avisar conclusão: ${data.avisar ? 'sim' : 'não / não marcado'}<br>` +
+          `<a href="${data.card.shortUrl}" target="_blank" rel="noopener">Abrir no Trello</a>`
+        email.value = data.email || ''
+        panel.classList.add('show')
+        msg.className = 'msg ok'
+        msg.textContent = 'Card carregado.'
+      } catch (err) {
+        panel.classList.remove('show')
+        msg.className = 'msg err'
+        msg.textContent = err.message || 'Erro ao buscar card.'
+      } finally {
+        btnLoad.disabled = false
+      }
+    })
+
+    btnNotify.addEventListener('click', async () => {
+      msg2.className = 'msg'
+      btnNotify.disabled = true
+      btnMailto.hidden = true
+      try {
+        const res = await fetch('/api/notificar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            invite,
+            card: currentCard || document.getElementById('card').value,
+            email: email.value,
+            mensagem: mensagem.value,
+          }),
+        })
+        const data = await res.json()
+        if (!res.ok || !data.ok) throw new Error(data.error || 'Falha')
+        msg2.className = 'msg ok'
+        msg2.textContent = data.message
+        if (data.mailto) {
+          btnMailto.href = data.mailto
+          btnMailto.hidden = false
+          if (!data.sent) window.location.href = data.mailto
+        }
+      } catch (err) {
+        msg2.className = 'msg err'
+        msg2.textContent = err.message || 'Erro ao notificar.'
+      } finally {
+        btnNotify.disabled = false
+      }
+    })
+  </script>
+</body>
+</html>
