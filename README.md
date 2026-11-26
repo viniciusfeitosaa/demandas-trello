@@ -1,59 +1,61 @@
 # Formulário de demandas → Trello
 
-Form estático + API em **Cloudflare Pages Functions** (sem servidor ligado 24h, sem cold start de free tier).
+Sua tela em `public/` + API no **Cloudflare Worker** (plano free, sem cold sleep de PaaS).
 
-## Deploy (Cloudflare Pages) — recomendado
+Você **não** mantém servidor. O GitHub Action publica sozinho a cada push na `main`.
 
-1. Conta em [dash.cloudflare.com](https://dash.cloudflare.com)
-2. **Workers & Pages** → **Create** → **Pages** → **Connect to Git**
-3. Repo: `viniciusfeitosaa/demandas-trello`
-4. Build settings:
-   - Framework preset: **None**
-   - Build command: *(vazio)* ou `npm run build`
-   - Build output directory: `public`
-   - **Deploy command: DEIXE VAZIO** — não use `npx wrangler deploy` (isso é de Worker e quebra o Pages)
-5. **Environment variables** (Production):
-   - `TRELLO_KEY` = sua key
-   - `TRELLO_TOKEN` = seu token
-   - `TRELLO_LIST_ID` = `6b04dde7590b0cb96af2c5b6` (opcional se já vier do `wrangler.toml`)
-   - `FORM_SECRET` = `2026`
-6. Deploy → URL tipo `https://demanda-trello.pages.dev`
+## Setup único (gratuito)
 
-### Link para clientes
+### 1. Token Cloudflare
+1. [dash.cloudflare.com](https://dash.cloudflare.com) → perfil → **API Tokens** → **Create Token**
+2. Template **Edit Cloudflare Workers** → Create
+3. Copie o token
+4. Em **Workers & Pages**, anote o **Account ID** (sidebar direita)
 
-`https://SEU-PROJETO.pages.dev/?invite=2026`
+### 2. Secrets no GitHub
+Repo → **Settings** → **Secrets and variables** → **Actions** → New:
 
-### Se o build falhar com `Missing entry-point`
+| Secret | Valor |
+|--------|--------|
+| `CLOUDFLARE_API_TOKEN` | token do passo 1 |
+| `CLOUDFLARE_ACCOUNT_ID` | Account ID |
 
-Você colocou **Deploy command** = `npx wrangler deploy`. No Pages isso é errado.
+### 3. Secrets Trello no Cloudflare (uma vez)
+Workers & Pages → **demanda-trello** → Settings → Variables:
 
-1. Projeto → **Settings** → **Builds & deployments**
-2. **Deploy command** → apague (vazio)
-3. **Build output directory** → `public`
-4. **Retry deployment**
+- `TRELLO_KEY` (Secret)
+- `TRELLO_TOKEN` (Secret)
 
-### CLI (alternativa)
+(`FORM_SECRET=2026` e `TRELLO_LIST_ID` já vão no `wrangler.toml`.)
+
+Ou no PC (logado no wrangler):
 
 ```bash
-npm i
-npx wrangler pages project create demanda-trello
-npx wrangler pages secret put TRELLO_KEY --project-name=demanda-trello
-npx wrangler pages secret put TRELLO_TOKEN --project-name=demanda-trello
-npm run deploy
+npx wrangler secret put TRELLO_KEY
+npx wrangler secret put TRELLO_TOKEN
 ```
+
+### 4. Disparar deploy
+- Push na `main`, ou
+- Aba **Actions** → **Deploy Cloudflare (gratis)** → **Run workflow**
+
+URL final (exemplo):
+
+`https://demanda-trello.<conta>.workers.dev/?invite=2026`
+
+A URL exata sai no log do Action / painel **Workers**.
 
 ## Local
 
 ```bash
 cp .env.example .env
-# preencha TRELLO_KEY e TRELLO_TOKEN
 npm install
+npx wrangler secret put TRELLO_KEY
+npx wrangler secret put TRELLO_TOKEN
 npm run dev
 ```
 
-`npm run dev` sobe Pages local (`wrangler pages dev`).  
-`npm start` ainda sobe o Express antigo (opcional).
+## Render / GitHub Pages
 
-## Render (legado)
-
-O `render.yaml` ficou só como histórico. Pode **apagar o serviço no Render** depois que o Pages estiver ok — free lá dorme e atrasa.
+- **Render**: legado (dorme no free). Pode apagar depois do Worker no ar.
+- **github.io**: só estático — **não** roda a API. Não use como link do cliente.
