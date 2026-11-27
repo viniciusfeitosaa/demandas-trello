@@ -191,7 +191,13 @@ async function handleCardInfo(request, env) {
 }
 
 function oneLine(text, max = 200) {
-  return clean(text, max).replace(/[\r\n\t]+/g, ' ').replace(/\s+/g, ' ').trim()
+  return String(text ?? '')
+    .replace(/\\n/g, ' ')
+    .replace(/\\r/g, ' ')
+    .replace(/[\u0000-\u001F\u007F\u2028\u2029]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, max)
 }
 
 function buildNotifyMail({ nome, email, cardName, cardUrl, mensagem }) {
@@ -283,7 +289,7 @@ async function handleNotificar(request, env) {
         body: JSON.stringify({
           from: env.NOTIFY_FROM,
           to: [email],
-          subject: mail.assunto,
+          subject: oneLine(mail.assunto, 120),
           text: mail.corpo,
           html: mail.html,
         }),
