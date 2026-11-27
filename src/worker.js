@@ -190,15 +190,20 @@ async function handleCardInfo(request, env) {
   })
 }
 
+function oneLine(text, max = 200) {
+  return clean(text, max).replace(/[\r\n\t]+/g, ' ').replace(/\s+/g, ' ').trim()
+}
+
 function buildNotifyMail({ nome, email, cardName, cardUrl, mensagem }) {
-  const assunto = `Demanda concluída: ${cardName.slice(0, 80)}`
+  const safeName = oneLine(cardName, 80)
+  const assunto = oneLine(`Demanda concluída: ${safeName}`, 120)
   const corpo = [
     `Ola${nome ? ` ${nome}` : ''},`,
     '',
     'Sua demanda foi concluida.',
     '',
-    `Titulo: ${cardName}`,
-    cardUrl ? `Card: ${cardUrl}` : '',
+    `Titulo: ${safeName}`,
+    cardUrl ? `Card: ${oneLine(cardUrl, 200)}` : '',
     '',
     mensagem ? `Retorno:\n${mensagem}` : '',
     '',
@@ -209,15 +214,22 @@ function buildNotifyMail({ nome, email, cardName, cardUrl, mensagem }) {
     .join('\n')
     .trim()
 
+  const escapeHtml = (s) =>
+    String(s || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+
   const msgHtml = mensagem
-    ? `<p><strong>Retorno:</strong></p><p>${mensagem.replace(/\n/g, '<br>')}</p>`
+    ? `<p><strong>Retorno:</strong></p><p>${escapeHtml(mensagem).replace(/\n/g, '<br>')}</p>`
     : ''
   const html = `
     <div style="font-family:Georgia,serif;line-height:1.5;color:#1a2332">
-      <p>Ola${nome ? ` ${nome}` : ''},</p>
+      <p>Ola${nome ? ` ${escapeHtml(oneLine(nome, 80))}` : ''},</p>
       <p>Sua demanda foi <strong>concluida</strong>.</p>
-      <p><strong>Titulo:</strong> ${cardName}</p>
-      ${cardUrl ? `<p><a href="${cardUrl}">Ver referencia</a></p>` : ''}
+      <p><strong>Titulo:</strong> ${escapeHtml(safeName)}</p>
+      ${cardUrl ? `<p><a href="${escapeHtml(oneLine(cardUrl, 200))}">Ver referencia</a></p>` : ''}
       ${msgHtml}
       <p>Atenciosamente,<br>Vinicius Feitosa — Servicos em TI</p>
     </div>
